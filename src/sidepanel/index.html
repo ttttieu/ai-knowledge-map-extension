@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Map</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Project Header -->
+    <header class="panel-header">
+        <div class="project-section">
+            <select id="projectSelect" class="project-select" title="Select Project">
+                <option value="">-- Select Project --</option>
+            </select>
+            <button id="btnNewProject" class="btn btn-icon" title="Create New Project">➕</button>
+            <button id="btnDeleteProject" class="btn btn-icon btn-danger-icon" title="Delete Current Project">🗑️</button>
+        </div>
+        <div class="project-name-display">
+            <span id="currentProjectName">No Project Selected</span>
+            <span id="nodeCount" class="node-count">0 nodes</span>
+        </div>
+    </header>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <div class="toolbar-group">
+            <button id="btnForceLayout" class="btn btn-secondary" title="Force-directed Layout">
+                🔄 Auto Layout
+            </button>
+            <button id="btnHierarchical" class="btn btn-secondary" title="Hierarchical Layout">
+                📊 Grid
+            </button>
+            <button id="btnRadial" class="btn btn-secondary" title="Radial Layout">
+                🎯 Radial
+            </button>
+        </div>
+        <div class="toolbar-group">
+            <button id="btnExportMd" class="btn btn-primary" title="Export to Markdown">
+                📄 Export MD
+            </button>
+            <button id="btnExportMermaid" class="btn btn-primary" title="Export for Notion (Mermaid)">
+                📤 Notion
+            </button>
+            <button id="btnClearNodes" class="btn btn-danger" title="Clear All Nodes">
+                🗑️ Clear
+            </button>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div id="notification" class="notification hidden"></div>
+
+    <!-- Cytoscape Container -->
+    <div id="cy"></div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="empty-state">
+        <div class="empty-icon">🗺️</div>
+        <h2 id="emptyTitle">Welcome to Knowledge Map</h2>
+        <p id="emptyText">Create a new project or select an existing one to start building your knowledge map.</p>
+    </div>
+
+    <!-- Node Detail Panel -->
+    <div id="detailPanel" class="detail-panel hidden">
+        <div class="detail-header">
+            <h3 id="detailTitle">Node Details</h3>
+            <button id="btnCloseDetail" class="close-btn">✕</button>
+        </div>
+        <div class="detail-content">
+            <div class="detail-meta">
+                <span id="detailType" class="type-badge"></span>
+                <span id="detailPlatform" class="platform-badge hidden"></span>
+            </div>
+            <p id="detailText" class="detail-text"></p>
+            <a id="detailSource" href="#" target="_blank" rel="noopener noreferrer" class="source-link hidden">View Source →</a>
+            <div class="detail-actions">
+                <button id="btnDeleteNode" class="btn btn-danger btn-sm">🗑️ Delete Node</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Project Modal -->
+    <div id="newProjectModal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <h3>Create New Project</h3>
+            <input type="text" id="newProjectName" class="input" placeholder="Enter project name..." maxlength="50">
+            <div class="modal-actions">
+                <button id="btnCancelProject" class="btn btn-secondary">Cancel</button>
+                <button id="btnConfirmProject" class="btn btn-primary">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Scripts -->
+    <script src="../assets/cytoscape.min.js"></script>
+    <script src="autoLayout.js"></script>
+    <script src="index.js"></script>
+</body>
+</html>

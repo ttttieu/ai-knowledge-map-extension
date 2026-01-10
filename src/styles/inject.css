@@ -1,0 +1,78 @@
+/* 1. Cấu trúc cơ bản của nút */
+.add-to-map-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    margin: 8px 0;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    border: 1px solid transparent;
+    
+    /* Màu mặc định (Fallback) */
+    background-color: rgba(128, 128, 128, 0.1);
+    color: inherit;
+}
+
+.add-to-map-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.add-to-map-button:active {
+    transform: translateY(0);
+}
+
+/* 2. Tự động thích nghi theo từng nền tảng (Adaptive Colors) */
+
+/* --- ChatGPT --- */
+[hostname*="chatgpt.com"] .add-to-map-button {
+    background-color: var(--main-surface-tertiary, #f9f9f9);
+    border-color: var(--border-medium, #e5e5e5);
+    color: var(--text-primary, #000);
+}
+[hostname*="chatgpt.com"] .add-to-map-button:hover {
+    background-color: var(--main-surface-secondary);
+}
+
+/* --- Claude (Anthropic) --- */
+[hostname*="claude.ai"] .add-to-map-button {
+    /* Claude dùng tông màu kem đặc trưng */
+    background-color: var(--bg-300, #e8e7e3);
+    border-color: var(--border-300, #d1d0cb);
+    color: var(--text-100, #222);
+}
+
+/* --- Gemini (Google) --- */
+[hostname*="gemini.google.com"] .add-to-map-button {
+    background-color: var(--google-gray-100, #f1f3f4);
+    border-color: var(--google-gray-300, #dadce0);
+    color: var(--gm3-sys-color-on-surface, #1f1f1f);
+}
+/* Chế độ tối của Gemini thường có class .dark-theme */
+.dark-theme [hostname*="gemini.google.com"] .add-to-map-button {
+    background-color: rgba(255,255,255,0.1);
+    color: #e3e3e3;
+}
+
+/* --- Grok (xAI) --- */
+[hostname*="grok.com"] .add-to-map-button {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #efefef;
+}
+[hostname*="grok.com"] .add-to-map-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: #f5d020; /* Màu vàng đặc trưng của Grok */
+}
+
+/* 3. Logic nhận diện Dark Mode chung (nếu trang không dùng biến CSS) */
+@media (prefers-color-scheme: dark) {
+    .add-to-map-button {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+}

@@ -1,0 +1,7 @@
+# .gitignore mẫu cho Vanilla JS
+.DS_Store
+Thumbs.db
+*.log
+
+# Nếu bạn có lưu trữ API Key trong một file config riêng
+src/config.js

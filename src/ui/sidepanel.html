@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Knowledge Map Sidepanel</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; font-family: sans-serif; }
+        #cy { flex-grow: 1; width: 100%; background-color: #f8f9fa; } /* Nơi vẽ bản đồ */
+        .controls { padding: 10px; border-bottom: 1px solid #ccc; display: flex; gap: 10px; background: white; }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <select id="projectSelect"><option>Đang tải dự án...</option></select>
+        <button id="reLayout">Sắp xếp lại</button>
+        <button id="exportJson">Xuất JSON</button>
+    </div>
+
+    <div id="cy"></div>
+    <div class="controls">
+    <select id="projectSelect"></select> <button id="addProject">+ New Project</button>
+    </div>
+
+    <div id="nodeModal" style="display:none; position:fixed; top:20%; left:10%; right:10%; background:white; padding:20px; border:1px solid #000; z-index:1000;">
+        <h3>Edit Node</h3>
+        <input type="text" id="editTitle" style="width:100%"><br><br>
+        <textarea id="editContent" style="width:100%; height:100px;"></textarea><br><br>
+        <button id="saveNode">Save</button>
+        <button id="closeModal">Cancel</button>
+    </div>
+    <script src="../assets/dexie.min.js"></script>
+    <script src="../assets/cytoscape.min.js"></script>
+    
+    <script type="module" src="sidepanel.js"></script>
+</body>
+</html>
