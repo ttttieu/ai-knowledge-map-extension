@@ -277,7 +277,7 @@ const STORAGE_KEYS = {
  * @param {Function} sendResponse - Response callback
  */
 const handleAddNodesToMap = async (message, sendResponse) => {
-  const { nodes, sourceUrl, sourcePlatform, timestamp } = message;
+  const { nodes, sourceUrl, sourcePlatform, timestamp, messageIndex } = message;
 
   try {
     console.log(`📝 Processing ${nodes?.length || 0} nodes...`);
@@ -303,17 +303,18 @@ const handleAddNodesToMap = async (message, sendResponse) => {
 
     const project = projects[currentProjectId];
     
-    // Create node objects for the project
+    // Create node objects for the project (v4 structure)
     const newNodes = nodes.map((node, idx) => ({
       id: `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       title: node.title || 'Untitled',
-      content: node.content || '',
+      summary: node.summary || '',
+      suggestions: node.suggestions || '',
       type: node.type || 'CORE',
       platform: sourcePlatform || '',
       sourceUrl: sourceUrl || '',
+      messageIndex: messageIndex ?? -1,
       timestamp: timestamp || new Date().toISOString(),
-      createdAt: Date.now(),
-      metadata: node.metadata || {}
+      createdAt: Date.now()
     }));
 
     // Add nodes to project

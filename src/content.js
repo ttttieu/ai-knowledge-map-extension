@@ -3,6 +3,11 @@
  * Self-contained script with all logic bundled (no ES module imports)
  * 
  * Supports: ChatGPT, Claude, Gemini, Grok
+ * 
+ * v4 Features:
+ * - 1 response = 1 node (summary + suggestions)
+ * - Option C: Prompt user to edit title
+ * - Scroll to source message
  */
 
 (function() {
@@ -70,9 +75,6 @@
   // ADAPTER FUNCTIONS
   // ============================================
 
-  /**
-   * Get current adapter based on hostname
-   */
   function getCurrentAdapter() {
     const hostname = window.location.hostname;
     
@@ -90,9 +92,6 @@
     return null;
   }
 
-  /**
-   * Find the last AI response element
-   */
   function findLastResponse(config) {
     const selectors = config.messageRow.split(',').map(s => s.trim());
     
@@ -102,21 +101,15 @@
         if (responses.length > 0) {
           return responses[responses.length - 1];
         }
-      } catch (e) {
-        // Invalid selector, try next
-      }
+      } catch (e) {}
     }
     
     return null;
   }
 
-  /**
-   * Extract clean text from element
-   */
   function extractText(element, config) {
     if (!element) return '';
 
-    // Try to find content area first
     const contentSelectors = config.contentArea.split(',').map(s => s.trim());
     let target = element;
     
@@ -127,23 +120,15 @@
           target = contentNode;
           break;
         }
-      } catch (e) {
-        // Invalid selector, continue
-      }
+      } catch (e) {}
     }
 
-    // Clone to avoid modifying original
     const clone = target.cloneNode(true);
 
-    // Remove noise elements
     const noiseSelectors = [
-      'button',
-      '.sr-only',
-      '.add-to-map-button',
-      '[aria-label*="copy"]',
-      '[aria-label*="Copy"]',
-      'svg',
-      '.copy-button'
+      'button', '.sr-only', '.add-to-map-button',
+      '[aria-label*="copy"]', '[aria-label*="Copy"]',
+      'svg', '.copy-button'
     ];
     
     noiseSelectors.forEach(selector => {
@@ -156,8 +141,27 @@
   }
 
   /**
-   * Check if AI is currently generating
+   * Extract HTML content for better parsing
    */
+  function extractHtml(element, config) {
+    if (!element) return '';
+
+    const contentSelectors = config.contentArea.split(',').map(s => s.trim());
+    let target = element;
+    
+    for (const selector of contentSelectors) {
+      try {
+        const contentNode = element.querySelector(selector);
+        if (contentNode) {
+          target = contentNode;
+          break;
+        }
+      } catch (e) {}
+    }
+
+    return target;
+  }
+
   function isGenerating(config) {
     if (!config.stopButton) return false;
     
@@ -170,100 +174,312 @@
   }
 
   // ============================================
-  // SMART PARSER
+  // SMART PARSER - 1 node với summary + gợi mở
   // ============================================
 
   /**
-   * Parse content into structured nodes
+   * Extract title from HTML headings (h1 > h2 > h3 > first line)
    */
-  function parseContent(text) {
-    if (!text || typeof text !== 'string') {
+  function extractTitleFromHtml(element) {
+    if (!element) return 'Untitled Response';
+    
+    // Try h1 first, then h2, then h3
+    const headingSelectors = ['h1', 'h2', 'h3', 'h4'];
+    
+    for (const selector of headingSelectors) {
+      const heading = element.querySelector(selector);
+      if (heading && heading.textContent.trim()) {
+        return heading.textContent.trim().substring(0, 100);
+      }
+    }
+    
+    // Try bold text at start (common in AI responses)
+    const firstStrong = element.querySelector('strong, b');
+    if (firstStrong && firstStrong.textContent.trim()) {
+      const text = firstStrong.textContent.trim();
+      if (text.length > 10 && text.length < 150) {
+        return text.substring(0, 100);
+      }
+    }
+    
+    // Fallback: first meaningful line from text
+    const text = element.innerText || '';
+    const lines = text.split('\n').filter(l => l.trim().length > 10);
+    if (lines.length > 0) {
+      const firstLine = lines[0].trim()
+        .replace(/^#+\s*/, '')
+        .replace(/\*\*/g, '');
+      return firstLine.length > 100 ? firstLine.substring(0, 97) + '...' : firstLine;
+    }
+    
+    return 'Untitled Response';
+  }
+
+  /**
+   * Extract summary (first 3-5 meaningful lines, excluding title)
+   */
+  function extractSummary(text, title) {
+    const lines = text.split('\n').filter(l => l.trim().length > 5);
+    const summaryLines = [];
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      // Skip if this is the title
+      if (trimmed === title || trimmed.includes(title)) continue;
+      
+      // Skip headings
+      if (/^#{1,4}\s/.test(trimmed)) continue;
+      
+      // Clean up line
+      const cleaned = trimmed
+        .replace(/^\*\*([^*]+)\*\*:?\s*/, '$1: ')
+        .replace(/^[-*•]\s*/, '• ');
+      
+      if (cleaned.length > 10) {
+        summaryLines.push(cleaned);
+      }
+      
+      // Stop after 5 lines or ~350 chars
+      if (summaryLines.length >= 5 || summaryLines.join('\n').length > 350) {
+        break;
+      }
+    }
+    
+    return summaryLines.join('\n').substring(0, 400);
+  }
+
+  /**
+   * Extract suggestions from HTML - find last <ol> or <ul> with <li> items
+   * ChatGPT pattern: <p>Nếu bạn muốn...</p> <ul><li>...</li><li>...</li></ul>
+   */
+  function extractSuggestionsFromHtml(element) {
+    if (!element) return '';
+    
+    // Find all <ol> and <ul> elements
+    const lists = element.querySelectorAll('ol, ul');
+    
+    if (lists.length === 0) {
+      // Fallback to text-based detection
+      return extractSuggestionsFromText(element.innerText || '');
+    }
+    
+    // Get the LAST list (usually suggestions are at the end)
+    const lastList = lists[lists.length - 1];
+    const listItems = lastList.querySelectorAll('li');
+    
+    if (listItems.length < 2) {
+      // Not enough items, try second-to-last list
+      if (lists.length > 1) {
+        const secondLastList = lists[lists.length - 2];
+        const items2 = secondLastList.querySelectorAll('li');
+        if (items2.length >= 2) {
+          return extractListItems(items2);
+        }
+      }
+      // Still not enough, fallback to text
+      return extractSuggestionsFromText(element.innerText || '');
+    }
+    
+    return extractListItems(listItems);
+  }
+  
+  /**
+   * Extract text from list items
+   */
+  function extractListItems(listItems) {
+    const suggestions = [];
+    
+    // Max 10 items
+    const items = Array.from(listItems).slice(0, 10);
+    
+    for (const li of items) {
+      // Get text, clean up
+      let text = li.innerText || li.textContent || '';
+      text = text.trim();
+      
+      if (text.length > 5) {
+        // Remove leading numbers/bullets that might be in text
+        text = text
+          .replace(/^\d+[\.\)]\s*/, '')
+          .replace(/^[-•*]\s*/, '')
+          .trim();
+        
+        suggestions.push('→ ' + text);
+      }
+    }
+    
+    return suggestions.join('\n').substring(0, 800);
+  }
+  
+  /**
+   * Fallback: Extract suggestions from text using consecutive pattern detection
+   */
+  function extractSuggestionsFromText(text) {
+    const lines = text.split('\n').filter(l => l.trim());
+    
+    // Get last 25 lines
+    const bottomLines = lines.slice(-25);
+    
+    // Detect pattern type for each line
+    function getPatternType(line) {
+      const trimmed = line.trim();
+      
+      // Numbered: 1. 2. 3. or 1) 2) 3)
+      if (/^\d+[\.\)]\s/.test(trimmed)) {
+        return 'numbered';
+      }
+      
+      // Common bullet characters
+      if (/^[-•*]\s/.test(trimmed)) {
+        return 'bullet';
+      }
+      
+      // Emoji bullets (🔹, ✅, ➡️, etc.)
+      const emojiMatch = trimmed.match(/^([\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[✓✔→➡►▶●○■□▪▫])\s*/u);
+      if (emojiMatch) {
+        return 'emoji';
+      }
+      
+      return null;
+    }
+    
+    // Find consecutive groups with same pattern
+    const groups = [];
+    let currentGroup = [];
+    let currentPattern = null;
+    
+    for (let i = 0; i < bottomLines.length; i++) {
+      const line = bottomLines[i];
+      const pattern = getPatternType(line);
+      
+      if (pattern) {
+        if (currentGroup.length === 0 || pattern === currentPattern) {
+          currentGroup.push(line);
+          currentPattern = pattern;
+        } else {
+          // Different pattern, save current group if valid
+          if (currentGroup.length >= 2) {
+            groups.push([...currentGroup]);
+          }
+          currentGroup = [line];
+          currentPattern = pattern;
+        }
+      } else {
+        // Non-pattern line
+        if (currentGroup.length >= 2) {
+          groups.push([...currentGroup]);
+        }
+        currentGroup = [];
+        currentPattern = null;
+      }
+    }
+    
+    // Don't forget last group
+    if (currentGroup.length >= 2) {
+      groups.push([...currentGroup]);
+    }
+    
+    // Find the best group (prefer longer, and prefer the last one)
+    let bestGroup = [];
+    for (const group of groups) {
+      if (group.length >= bestGroup.length) {
+        bestGroup = group;
+      }
+    }
+    
+    // If no good group found, return empty
+    if (bestGroup.length < 2) {
+      return '';
+    }
+    
+    // Format the suggestions
+    const suggestions = bestGroup.slice(0, 10).map(line => {
+      const cleaned = line.trim()
+        .replace(/^\d+[\.\)]\s*/, '')
+        .replace(/^[-•*]\s*/, '')
+        .replace(/^([\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[✓✔→➡►▶●○■□▪▫])\s*/u, '');
+      return '→ ' + cleaned;
+    });
+    
+    return suggestions.join('\n').substring(0, 600);
+  }
+
+  /**
+   * Parse content into a single node with title, summary, suggestions
+   */
+  function parseContent(text, htmlElement) {
+    if (!text || typeof text !== 'string' || text.trim().length < 20) {
       return [];
     }
 
-    const nodes = [];
-    const lines = text.split('\n').filter(line => line.trim());
+    // Extract title from HTML (better accuracy)
+    const title = extractTitleFromHtml(htmlElement);
     
-    // Detect headers and main points
-    let currentSection = null;
-    let contentBuffer = [];
+    // Extract summary (excluding title)
+    const summary = extractSummary(text, title);
+    
+    // Extract suggestions from HTML (find <ol>/<ul> with <li>)
+    const suggestions = extractSuggestionsFromHtml(htmlElement);
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      
-      // Skip empty lines
-      if (!line) continue;
-
-      // Detect headers (# style or **bold** style or numbered)
-      const isHeader = /^#+\s/.test(line) || 
-                       /^\*\*[^*]+\*\*:?\s*$/.test(line) ||
-                       /^\d+\.\s+\*\*/.test(line) ||
-                       /^#{1,3}\s/.test(line);
-      
-      // Detect list items
-      const isListItem = /^[-*•]\s/.test(line) || /^\d+\.\s/.test(line);
-
-      if (isHeader) {
-        // Save previous section
-        if (currentSection && contentBuffer.length > 0) {
-          nodes.push({
-            type: nodes.length === 0 ? 'CORE' : 'EXPANSION',
-            title: currentSection,
-            content: contentBuffer.join('\n').trim()
-          });
-          contentBuffer = [];
-        }
-        
-        // Start new section
-        currentSection = line
-          .replace(/^#+\s*/, '')
-          .replace(/^\*\*|\*\*$/g, '')
-          .replace(/^\d+\.\s*/, '')
-          .replace(/:$/, '')
-          .trim();
-          
-      } else if (isListItem && !currentSection) {
-        // Standalone list item becomes a node
-        const itemText = line
-          .replace(/^[-*•]\s*/, '')
-          .replace(/^\d+\.\s*/, '')
-          .trim();
-        
-        if (itemText.length > 10) {
-          nodes.push({
-            type: 'EXPANSION',
-            title: itemText.substring(0, 60) + (itemText.length > 60 ? '...' : ''),
-            content: itemText
-          });
-        }
-      } else {
-        // Regular content
-        contentBuffer.push(line);
-      }
-    }
-
-    // Don't forget last section
-    if (currentSection && contentBuffer.length > 0) {
-      nodes.push({
-        type: nodes.length === 0 ? 'CORE' : 'EXPANSION',
-        title: currentSection,
-        content: contentBuffer.join('\n').trim()
-      });
-    }
-
-    // If no structured content found, create a single CORE node
-    if (nodes.length === 0 && text.trim().length > 0) {
-      const firstSentence = text.split(/[.!?]/)[0].trim();
-      nodes.push({
-        type: 'CORE',
-        title: firstSentence.substring(0, 80) + (firstSentence.length > 80 ? '...' : ''),
-        content: text.trim().substring(0, 500)
-      });
-    }
-
-    console.log(`📊 Parsed ${nodes.length} nodes`);
-    return nodes;
+    console.log(`📊 Parsed: "${title.substring(0, 50)}..."`);
+    console.log(`📊 Suggestions found: ${suggestions ? 'Yes' : 'No'}`);
+    
+    return [{
+      type: 'CORE',
+      title: title,
+      summary: summary,
+      suggestions: suggestions,
+      fullContent: text.substring(0, 2000)
+    }];
   }
+
+  // ============================================
+  // SCROLL TO MESSAGE
+  // ============================================
+
+  function scrollToMessage(messageIndex) {
+    const adapter = getCurrentAdapter();
+    if (!adapter) return false;
+    
+    const allResponses = document.querySelectorAll(adapter.CONFIG.messageRow);
+    
+    if (messageIndex >= 0 && messageIndex < allResponses.length) {
+      const targetMessage = allResponses[messageIndex];
+      
+      targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      
+      const originalBg = targetMessage.style.backgroundColor;
+      targetMessage.style.backgroundColor = '#fef08a';
+      targetMessage.style.transition = 'background-color 0.3s';
+      
+      setTimeout(() => {
+        targetMessage.style.backgroundColor = originalBg || '';
+      }, 2000);
+      
+      console.log(`✅ Scrolled to message #${messageIndex}`);
+      return true;
+    }
+    
+    return false;
+  }
+
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'SCROLL_TO_MESSAGE') {
+      const { messageIndex, expectedUrl } = message;
+      
+      const currentUrl = window.location.href.split('#')[0];
+      
+      if (expectedUrl && !currentUrl.includes(expectedUrl.split('#')[0])) {
+        sendResponse({ success: false, reason: 'Different conversation' });
+        return;
+      }
+      
+      const success = scrollToMessage(messageIndex);
+      sendResponse({ success });
+    }
+    return true;
+  });
 
   // ============================================
   // BUTTON STATE MANAGEMENT
@@ -319,7 +535,7 @@
   }
 
   // ============================================
-  // ADD TO MAP HANDLER
+  // ADD TO MAP HANDLER (Option C: Edit Title)
   // ============================================
 
   async function handleAddToMap(button, element) {
@@ -330,13 +546,11 @@
       return;
     }
 
-    // Check if still generating
     if (adapter.isGenerating()) {
       alert('⏳ Please wait for the AI to finish generating');
       return;
     }
 
-    // Check for selected project
     const projectCheck = await checkCurrentProject();
     
     if (!projectCheck.hasProject) {
@@ -344,12 +558,14 @@
       return;
     }
 
-    // Set parsing state
     setButtonParsing(button);
 
     try {
-      // Extract text
+      // Extract text content
       const rawContent = adapter.extractText(element);
+      
+      // Get HTML element for better title extraction
+      const htmlElement = extractHtml(element, adapter.CONFIG);
 
       if (!rawContent || rawContent.trim().length === 0) {
         alert('⚠️ No content found to add to map');
@@ -359,31 +575,51 @@
 
       console.log('📝 Extracted content length:', rawContent.length);
 
-      // Parse into nodes
-      const nodes = parseContent(rawContent);
+      // Parse into node (pass HTML element for title extraction)
+      const nodes = parseContent(rawContent, htmlElement);
 
       if (!nodes || nodes.length === 0) {
-        alert('⚠️ Could not parse content into nodes');
+        alert('⚠️ Could not parse content');
         enableButton(button);
         return;
       }
 
-      console.log(`✅ Parsed ${nodes.length} nodes`);
+      const node = nodes[0];
+      
+      // Option C: Prompt user to edit title
+      const suggestedTitle = node.title;
+      const userTitle = prompt(
+        '📝 Edit node title (or press OK to keep):\n\n' +
+        'Summary preview: ' + (node.summary || '').substring(0, 80) + '...',
+        suggestedTitle
+      );
+      
+      if (userTitle === null) {
+        enableButton(button);
+        return;
+      }
+      
+      node.title = userTitle.trim() || suggestedTitle;
 
-      // Send to background
+      // Get message index for scroll-to
+      const allResponses = document.querySelectorAll(adapter.CONFIG.messageRow);
+      const messageIndex = Array.from(allResponses).indexOf(element);
+      
+      const conversationUrl = window.location.href.split('#')[0];
+
       const response = await chrome.runtime.sendMessage({
         action: 'ADD_NODES_TO_MAP',
-        nodes: nodes,
-        sourceUrl: window.location.href,
+        nodes: [node],
+        sourceUrl: conversationUrl,
         sourcePlatform: adapter.CONFIG.name,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        messageIndex: messageIndex >= 0 ? messageIndex : 0
       });
 
       if (response && response.success) {
         setButtonSuccess(button, projectCheck.projectName);
-        console.log(`✅ ${nodes.length} nodes added to "${projectCheck.projectName}"`);
+        console.log(`✅ Node added to "${projectCheck.projectName}"`);
         
-        // Reset after 2 seconds
         setTimeout(() => enableButton(button), 2000);
       } else {
         const errorMsg = response?.error || 'Unknown error';
@@ -406,23 +642,15 @@
   function injectButton() {
     const adapter = getCurrentAdapter();
     
-    if (!adapter) {
-      return;
-    }
+    if (!adapter) return;
 
     try {
       const lastResponse = adapter.findLastResponse();
       
-      if (!lastResponse) {
-        return;
-      }
+      if (!lastResponse) return;
 
-      // Check if button already exists
-      if (lastResponse.querySelector('.add-to-map-button')) {
-        return;
-      }
+      if (lastResponse.querySelector('.add-to-map-button')) return;
 
-      // Create button
       const button = document.createElement('button');
       button.className = 'add-to-map-button';
       button.innerHTML = '📍 Add to Map';
@@ -445,13 +673,11 @@
         z-index: 10000;
       `;
 
-      // Check if generating
       if (adapter.isGenerating()) {
         disableButton(button);
         observeGenerationCompletion(button, adapter);
       }
 
-      // Hover effects
       button.addEventListener('mouseenter', () => {
         if (!button.disabled) {
           button.style.backgroundColor = '#2563eb';
@@ -468,14 +694,12 @@
         }
       });
 
-      // Click handler
       button.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         handleAddToMap(button, lastResponse);
       });
 
-      // Append to response
       lastResponse.appendChild(button);
       console.log(`✅ Button injected for ${adapter.CONFIG.name}`);
 
@@ -484,9 +708,6 @@
     }
   }
 
-  /**
-   * Watch for generation completion
-   */
   function observeGenerationCompletion(button, adapter) {
     const checkInterval = setInterval(() => {
       if (!adapter.isGenerating()) {
@@ -496,7 +717,6 @@
       }
     }, 500);
 
-    // Stop checking after 2 minutes
     setTimeout(() => clearInterval(checkInterval), 120000);
   }
 
@@ -507,10 +727,8 @@
   function initialize() {
     console.log('🚀 Knowledge Map Extension initializing...');
 
-    // Set hostname attribute
     document.body.setAttribute('data-km-hostname', window.location.hostname);
 
-    // Check if supported platform
     const adapter = getCurrentAdapter();
     if (!adapter) {
       console.log('⚠️ Not a supported AI platform');
@@ -519,13 +737,10 @@
 
     console.log(`✅ Detected platform: ${adapter.CONFIG.name}`);
 
-    // Inject button immediately
     injectButton();
 
-    // Set up periodic injection (for new messages)
     setInterval(injectButton, 2000);
 
-    // Also observe DOM changes
     const observer = new MutationObserver(() => {
       injectButton();
     });
@@ -538,7 +753,6 @@
     console.log('✅ Knowledge Map Extension ready!');
   }
 
-  // Start when DOM is ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initialize);
   } else {

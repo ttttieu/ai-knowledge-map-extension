@@ -328,8 +328,8 @@ function initCytoscape() {
         selector: 'node',
         style: {
           'shape': 'round-rectangle',
-          'width': 260,
-          'height': 100,
+          'width': 340,
+          'height': 130,
           'background-color': '#ffffff',
           'border-width': 3,
           'border-color': '#3b82f6',
@@ -337,11 +337,11 @@ function initCytoscape() {
           'text-valign': 'center',
           'text-halign': 'center',
           'text-wrap': 'wrap',
-          'text-max-width': '230px',
-          'font-size': '12px',
+          'text-max-width': '300px',
+          'font-size': '30px',
           'font-weight': '500',
           'color': '#1f2937',
-          'padding': '10px'
+          'padding': '12px'
         }
       },
       {
@@ -422,31 +422,45 @@ function renderNodes(nodes, append = false) {
     state.cy.elements().remove();
   }
   
-  const containerWidth = state.cy.width() || 800;
-  const containerHeight = state.cy.height() || 600;
+  const containerWidth = state.cy.width() || 1200;
+  const containerHeight = state.cy.height() || 800;
+  
+  // Grid layout for initial positions - 3 columns
+  const nodesPerRow = 3;
+  const spacingX = Math.max(400, containerWidth / (nodesPerRow + 1));
+  const spacingY = 250;
   
   nodes.forEach((node, idx) => {
-    // Random initial position for force layout
-    const x = containerWidth / 2 + (Math.random() - 0.5) * 400;
-    const y = containerHeight / 2 + (Math.random() - 0.5) * 400;
+    const col = idx % nodesPerRow;
+    const row = Math.floor(idx / nodesPerRow);
+    const x = spacingX * (col + 1);
+    const y = spacingY * (row + 1);
     
     state.cy.add({
       group: 'nodes',
       data: {
         id: node.id,
-        label: truncate(node.title, 50),
+        label: truncate(node.title, 60),
         title: node.title,
-        content: node.content,
+        summary: node.summary || '',
+        suggestions: node.suggestions || '',
+        content: node.content || node.summary || '',
         type: node.type,
         platform: node.platform,
         sourceUrl: node.sourceUrl,
-        timestamp: node.timestamp
+        messageIndex: node.messageIndex ?? -1,
+        timestamp: node.timestamp,
+        createdAt: node.createdAt || 0
       },
       position: { x, y }
     });
   });
   
   toggleEmptyState();
+  
+  if (nodes.length > 0) {
+    state.cy.fit(undefined, 50);
+  }
 }
 
 function renderCurrentProject() {
@@ -459,10 +473,10 @@ function renderCurrentProject() {
   
   renderNodes(project.nodes, false);
   
-  // Apply force layout
+  // Apply hierarchical layout by default (more organized)
   if (window.AutoLayout) {
     setTimeout(() => {
-      window.AutoLayout.applyForceLayout(state.cy);
+      window.AutoLayout.applyHierarchicalLayout(state.cy);
     }, 100);
   }
 }
@@ -485,11 +499,14 @@ function toggleEmptyState() {
 // ============================================
 
 function showDetailPanel(nodeData) {
-  $('#detailTitle').textContent = nodeData.title || 'Node Details';
+  // Header title
+  $('#detailTitle').textContent = 'Node Details';
+  
+  // Type badge
   $('#detailType').textContent = nodeData.type || 'NODE';
   $('#detailType').className = `type-badge type-${(nodeData.type || 'core').toLowerCase()}`;
-  $('#detailText').textContent = nodeData.content || 'No content';
   
+  // Platform badge
   const platformBadge = $('#detailPlatform');
   if (nodeData.platform) {
     platformBadge.textContent = nodeData.platform;
@@ -498,20 +515,296 @@ function showDetailPanel(nodeData) {
     platformBadge.classList.add('hidden');
   }
   
+  // Timestamp
+  const timestampEl = $('#detailTimestamp');
+  if (timestampEl && nodeData.timestamp) {
+    const date = new Date(nodeData.timestamp);
+    timestampEl.textContent = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    timestampEl.classList.remove('hidden');
+  } else if (timestampEl) {
+    timestampEl.classList.add('hidden');
+  }
+  
+  // Node Title (editable)
+  $('#detailNodeTitle').textContent = nodeData.title || 'Untitled';
+  
+  // Summary
+  const summaryText = nodeData.summary || nodeData.content || 'No summary available';
+  $('#detailSummary').textContent = summaryText;
+  
+  // Suggestions
+  const suggestionsSection = $('#suggestionsSection');
+  const suggestionsText = $('#detailSuggestions');
+  if (nodeData.suggestions && nodeData.suggestions.trim()) {
+    suggestionsText.textContent = nodeData.suggestions;
+    suggestionsSection.classList.remove('hidden');
+  } else {
+    suggestionsSection.classList.add('hidden');
+  }
+  
+  // Scroll to Source button
+  const scrollBtn = $('#btnScrollToSource');
   const sourceLink = $('#detailSource');
-  if (nodeData.sourceUrl) {
+  
+  if (nodeData.sourceUrl && nodeData.messageIndex !== undefined && nodeData.messageIndex >= 0) {
+    scrollBtn.dataset.sourceUrl = nodeData.sourceUrl;
+    scrollBtn.dataset.messageIndex = nodeData.messageIndex;
+    scrollBtn.classList.remove('hidden');
+    
+    sourceLink.href = nodeData.sourceUrl;
+    sourceLink.classList.remove('hidden');
+  } else if (nodeData.sourceUrl) {
+    scrollBtn.classList.add('hidden');
     sourceLink.href = nodeData.sourceUrl;
     sourceLink.classList.remove('hidden');
   } else {
+    scrollBtn.classList.add('hidden');
     sourceLink.classList.add('hidden');
   }
   
+  // Related nodes
+  displayRelatedNodes(nodeData);
+  
+  // Highlight related nodes on map
+  highlightRelatedNodes(state.selectedNodeId);
+  
   el.detailPanel.classList.remove('hidden');
+}
+
+/**
+ * Edit node title
+ */
+async function editNodeTitle() {
+  const project = getCurrentProject();
+  if (!project || !state.selectedNodeId) return;
+  
+  const node = project.nodes.find(n => n.id === state.selectedNodeId);
+  if (!node) return;
+  
+  const newTitle = prompt('📝 Edit node title:', node.title);
+  if (newTitle === null) return;
+  
+  node.title = newTitle.trim() || node.title;
+  
+  await saveToStorage();
+  
+  // Update display
+  $('#detailNodeTitle').textContent = node.title;
+  
+  // Update Cytoscape node
+  const cyNode = state.cy.getElementById(state.selectedNodeId);
+  if (cyNode) {
+    cyNode.data('title', node.title);
+    cyNode.data('label', truncate(node.title, 60));
+  }
+  
+  showNotification('✅ Title updated');
+}
+
+/**
+ * Edit node summary
+ */
+async function editNodeSummary() {
+  const project = getCurrentProject();
+  if (!project || !state.selectedNodeId) return;
+  
+  const node = project.nodes.find(n => n.id === state.selectedNodeId);
+  if (!node) return;
+  
+  const currentSummary = node.summary || node.content || '';
+  const newSummary = prompt('📝 Edit summary:', currentSummary);
+  if (newSummary === null) return;
+  
+  node.summary = newSummary.trim();
+  
+  await saveToStorage();
+  
+  // Update display
+  $('#detailSummary').textContent = node.summary;
+  
+  // Update Cytoscape node data
+  const cyNode = state.cy.getElementById(state.selectedNodeId);
+  if (cyNode) {
+    cyNode.data('summary', node.summary);
+  }
+  
+  showNotification('✅ Summary updated');
+}
+
+/**
+ * Handle scroll to source button click
+ */
+async function handleScrollToSource() {
+  const btn = $('#btnScrollToSource');
+  const sourceUrl = btn.dataset.sourceUrl;
+  const messageIndex = parseInt(btn.dataset.messageIndex, 10);
+  
+  if (!sourceUrl || isNaN(messageIndex)) {
+    showNotification('Cannot locate source', 'warning');
+    return;
+  }
+  
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
+    if (!tab) {
+      window.open(sourceUrl, '_blank');
+      return;
+    }
+    
+    const tabUrl = tab.url?.split('#')[0] || '';
+    const targetUrl = sourceUrl.split('#')[0];
+    
+    if (tabUrl.includes(targetUrl) || targetUrl.includes(tabUrl)) {
+      const response = await chrome.tabs.sendMessage(tab.id, {
+        action: 'SCROLL_TO_MESSAGE',
+        messageIndex: messageIndex,
+        expectedUrl: targetUrl
+      });
+      
+      if (response?.success) {
+        showNotification('📍 Scrolled to message', 'success');
+      } else {
+        window.open(sourceUrl, '_blank');
+      }
+    } else {
+      window.open(sourceUrl, '_blank');
+      showNotification('Opening conversation...', 'info');
+    }
+  } catch (error) {
+    console.error('Scroll to source error:', error);
+    window.open(sourceUrl, '_blank');
+  }
+}
+
+/**
+ * Display related nodes (previous nodes in same conversation)
+ * Shows nodes that came BEFORE the current one to help with thought flow
+ */
+function displayRelatedNodes(nodeData) {
+  const relatedContainer = $('#relatedNodes');
+  if (!relatedContainer) return;
+  
+  relatedContainer.innerHTML = '';
+  
+  const project = getCurrentProject();
+  if (!project) return;
+  
+  // Get the full node from project (has all data including createdAt)
+  const currentFullNode = project.nodes.find(n => n.id === state.selectedNodeId);
+  if (!currentFullNode) return;
+  
+  // Get current node's position indicators
+  const currentMessageIndex = currentFullNode.messageIndex ?? nodeData.messageIndex ?? -1;
+  const currentCreatedAt = currentFullNode.createdAt || 0;
+  
+  // Find nodes from same conversation that came BEFORE this one
+  const previousNodes = project.nodes.filter(node => {
+    // Skip current node
+    if (node.id === state.selectedNodeId) return false;
+    
+    // Must be same conversation (same URL)
+    if (!currentFullNode.sourceUrl || !node.sourceUrl) return false;
+    const url1 = currentFullNode.sourceUrl.split('#')[0];
+    const url2 = node.sourceUrl.split('#')[0];
+    if (url1 !== url2) return false;
+    
+    // Check if this node came BEFORE current node
+    const nodeMessageIndex = node.messageIndex ?? -1;
+    const nodeCreatedAt = node.createdAt || 0;
+    
+    // Compare by messageIndex first (more accurate)
+    if (currentMessageIndex >= 0 && nodeMessageIndex >= 0) {
+      return nodeMessageIndex < currentMessageIndex;
+    }
+    
+    // Fallback to createdAt
+    if (currentCreatedAt > 0 && nodeCreatedAt > 0) {
+      return nodeCreatedAt < currentCreatedAt;
+    }
+    
+    return false;
+  });
+  
+  if (previousNodes.length === 0) return;
+  
+  // Sort by messageIndex or createdAt (most recent first = closest to current)
+  previousNodes.sort((a, b) => {
+    const aIndex = a.messageIndex ?? -1;
+    const bIndex = b.messageIndex ?? -1;
+    if (aIndex >= 0 && bIndex >= 0) {
+      return bIndex - aIndex; // Descending (closest to current first)
+    }
+    return (b.createdAt || 0) - (a.createdAt || 0);
+  });
+  
+  relatedContainer.innerHTML = `<h4>📎 Previous in Conversation</h4>`;
+  
+  const list = document.createElement('div');
+  list.className = 'related-list';
+  
+  // Show up to 5 previous nodes (closest to current)
+  previousNodes.slice(0, 5).forEach(node => {
+    const item = document.createElement('div');
+    item.className = `related-item type-${node.type?.toLowerCase() || 'core'}`;
+    item.innerHTML = `
+      <span class="related-type">${node.type || 'NODE'}</span>
+      <span class="related-title">${truncate(node.title, 35)}</span>
+    `;
+    item.addEventListener('click', () => {
+      const cyNode = state.cy.getElementById(node.id);
+      if (cyNode) {
+        state.cy.animate({
+          center: { eles: cyNode },
+          zoom: 1.2
+        }, { duration: 300 });
+        state.selectedNodeId = node.id;
+        showDetailPanel(cyNode.data());
+      }
+    });
+    list.appendChild(item);
+  });
+  
+  relatedContainer.appendChild(list);
+}
+
+/**
+ * Highlight related nodes on the map
+ */
+function highlightRelatedNodes(nodeId) {
+  if (!state.cy) return;
+  
+  state.cy.nodes().removeClass('highlighted related');
+  
+  const selectedNode = state.cy.getElementById(nodeId);
+  if (selectedNode && selectedNode.length > 0) {
+    selectedNode.addClass('highlighted');
+    
+    const sourceUrl = selectedNode.data('sourceUrl');
+    if (sourceUrl) {
+      const baseUrl = sourceUrl.split('#')[0];
+      state.cy.nodes().forEach(node => {
+        if (node.id() !== nodeId) {
+          const nodeUrl = node.data('sourceUrl')?.split('#')[0];
+          if (nodeUrl === baseUrl) {
+            node.addClass('related');
+          }
+        }
+      });
+    }
+  }
+}
+
+function unhighlightAllNodes() {
+  if (state.cy) {
+    state.cy.nodes().removeClass('highlighted related');
+  }
 }
 
 function hideDetailPanel() {
   el.detailPanel.classList.add('hidden');
   state.selectedNodeId = null;
+  unhighlightAllNodes();
 }
 
 // ============================================
@@ -710,10 +1003,12 @@ function setupMessageListener() {
     
     switch (message.action) {
       case 'ADD_NODES_TO_MAP':
-        addNodesToProject(message.nodes, {
-          sourceUrl: message.sourceUrl,
-          sourcePlatform: message.sourcePlatform,
-          timestamp: message.timestamp
+        // Nodes already saved by background.js
+        // Just reload from storage and refresh display
+        loadFromStorage().then(() => {
+          renderCurrentProject();
+          updateNodeCount();
+          showNotification(`✅ Node added`);
         });
         sendResponse({ success: true });
         break;
@@ -793,6 +1088,9 @@ function setupEventHandlers() {
       deleteNode(state.selectedNodeId);
     }
   });
+  $('#btnScrollToSource').addEventListener('click', handleScrollToSource);
+  $('#btnEditTitle').addEventListener('click', editNodeTitle);
+  $('#btnEditSummary').addEventListener('click', editNodeSummary);
   
   // New Project Modal
   $('#btnCancelProject').addEventListener('click', hideNewProjectModal);

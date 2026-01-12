@@ -26,9 +26,9 @@
     <div class="toolbar">
         <div class="toolbar-group">
             <button id="btnForceLayout" class="btn btn-secondary" title="Force-directed Layout">
-                🔄 Auto Layout
+                🔄 Auto
             </button>
-            <button id="btnHierarchical" class="btn btn-secondary" title="Hierarchical Layout">
+            <button id="btnHierarchical" class="btn btn-secondary" title="Grid Layout">
                 📊 Grid
             </button>
             <button id="btnRadial" class="btn btn-secondary" title="Radial Layout">
@@ -37,13 +37,13 @@
         </div>
         <div class="toolbar-group">
             <button id="btnExportMd" class="btn btn-primary" title="Export to Markdown">
-                📄 Export MD
+                📄 MD
             </button>
-            <button id="btnExportMermaid" class="btn btn-primary" title="Export for Notion (Mermaid)">
+            <button id="btnExportMermaid" class="btn btn-primary" title="Export for Notion">
                 📤 Notion
             </button>
-            <button id="btnClearNodes" class="btn btn-danger" title="Clear All Nodes">
-                🗑️ Clear
+            <button id="btnClearNodes" class="btn btn-danger" title="Clear All">
+                🗑️
             </button>
         </div>
     </div>
@@ -65,15 +65,51 @@
     <div id="detailPanel" class="detail-panel hidden">
         <div class="detail-header">
             <h3 id="detailTitle">Node Details</h3>
-            <button id="btnCloseDetail" class="close-btn">✕</button>
+            <button id="btnCloseDetail" class="btn-back" title="Back to map">← Back</button>
         </div>
         <div class="detail-content">
             <div class="detail-meta">
                 <span id="detailType" class="type-badge"></span>
                 <span id="detailPlatform" class="platform-badge hidden"></span>
+                <span id="detailTimestamp" class="timestamp-badge hidden"></span>
             </div>
-            <p id="detailText" class="detail-text"></p>
-            <a id="detailSource" href="#" target="_blank" rel="noopener noreferrer" class="source-link hidden">View Source →</a>
+            
+            <!-- Title Section (Editable) -->
+            <div class="detail-section">
+                <div class="section-header">
+                    <h4>📌 Title</h4>
+                    <button id="btnEditTitle" class="btn-edit" title="Edit title">✏️</button>
+                </div>
+                <p id="detailNodeTitle" class="detail-title"></p>
+            </div>
+            
+            <!-- Summary Section (Editable) -->
+            <div class="detail-section">
+                <div class="section-header">
+                    <h4>📝 Summary</h4>
+                    <button id="btnEditSummary" class="btn-edit" title="Edit summary">✏️</button>
+                </div>
+                <p id="detailSummary" class="detail-text"></p>
+            </div>
+            
+            <!-- Suggestions Section -->
+            <div id="suggestionsSection" class="detail-section suggestions-section hidden">
+                <h4>💡 Gợi mở / Next Steps</h4>
+                <p id="detailSuggestions" class="detail-text suggestions-text"></p>
+            </div>
+            
+            <!-- Source Link -->
+            <button id="btnScrollToSource" class="btn btn-primary btn-block hidden">
+                🔗 Scroll to Source Message
+            </button>
+            <a id="detailSource" href="#" target="_blank" rel="noopener noreferrer" class="source-link hidden">
+                ↗️ Open Conversation
+            </a>
+            
+            <!-- Related Nodes -->
+            <div id="relatedNodes" class="related-nodes"></div>
+            
+            <!-- Actions -->
             <div class="detail-actions">
                 <button id="btnDeleteNode" class="btn btn-danger btn-sm">🗑️ Delete Node</button>
             </div>

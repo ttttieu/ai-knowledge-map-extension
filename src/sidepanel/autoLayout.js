@@ -8,33 +8,36 @@
 // Constants
 // ============================================
 const CONFIG = {
-  // Lực đẩy giữa các node (càng lớn càng đẩy xa)
-  REPULSION_STRENGTH: 8000,
+  // Lực đẩy giữa các node (tăng mạnh để nodes không chồng nhau)
+  REPULSION_STRENGTH: 50000,
   
-  // Lực hút của các edge (giữ các node liên kết gần nhau)
-  ATTRACTION_STRENGTH: 0.05,
+  // Lực hút của các edge (giảm để nodes spread out hơn)
+  ATTRACTION_STRENGTH: 0.01,
   
-  // Khoảng cách lý tưởng giữa các node
-  IDEAL_DISTANCE: 250,
+  // Khoảng cách lý tưởng giữa các node (tăng lên)
+  IDEAL_DISTANCE: 400,
   
   // Hệ số ma sát (giảm tốc độ di chuyển)
-  DAMPING: 0.85,
+  DAMPING: 0.8,
   
   // Ngưỡng dừng (khi năng lượng < ngưỡng thì dừng)
-  MIN_ENERGY: 0.1,
+  MIN_ENERGY: 0.5,
   
   // Số lần lặp tối đa
-  MAX_ITERATIONS: 300,
+  MAX_ITERATIONS: 500,
   
   // Kích thước node
-  NODE_WIDTH: 260,
-  NODE_HEIGHT: 120,
+  NODE_WIDTH: 280,
+  NODE_HEIGHT: 100,
   
   // Padding từ mép canvas
-  PADDING: 100,
+  PADDING: 150,
   
-  // Center gravity (kéo về tâm)
-  CENTER_GRAVITY: 0.01
+  // Center gravity (giảm xuống để nodes không dồn vào tâm)
+  CENTER_GRAVITY: 0.002,
+  
+  // Minimum distance between nodes
+  MIN_DISTANCE: 300
 };
 
 // ============================================
@@ -370,45 +373,59 @@ function applyHierarchicalLayout(cy, options = {}) {
   if (!cy || cy.nodes().length === 0) return;
 
   const {
-    nodeWidth = 280,
+    nodeWidth = 350,
     nodeHeight = 140,
-    horizontalSpacing = 320,
-    verticalSpacing = 200,
+    horizontalSpacing = 480,
+    verticalSpacing = 280,
     nodesPerRow = 3
   } = options;
 
   const nodes = cy.nodes();
   const coreNodes = nodes.filter(n => n.data('type') === 'CORE');
-  const otherNodes = nodes.filter(n => n.data('type') !== 'CORE');
+  const expansionNodes = nodes.filter(n => n.data('type') === 'EXPANSION');
+  const otherNodes = nodes.filter(n => !['CORE', 'EXPANSION'].includes(n.data('type')));
 
-  let index = 0;
+  let currentY = verticalSpacing / 2;
 
-  // Position CORE nodes first row
-  coreNodes.forEach((node) => {
+  // Position CORE nodes first row(s)
+  coreNodes.forEach((node, index) => {
     const col = index % nodesPerRow;
     const row = Math.floor(index / nodesPerRow);
     node.position({
       x: col * horizontalSpacing + horizontalSpacing / 2,
-      y: row * verticalSpacing + verticalSpacing / 2
+      y: currentY + row * verticalSpacing
     });
-    index++;
   });
 
-  // Position other nodes below
-  const startRow = Math.ceil(coreNodes.length / nodesPerRow);
-  index = 0;
+  // Calculate starting Y for expansion nodes
+  const coreRows = Math.ceil(coreNodes.length / nodesPerRow);
+  currentY += coreRows * verticalSpacing + 50;
 
-  otherNodes.forEach((node) => {
+  // Position EXPANSION nodes
+  expansionNodes.forEach((node, index) => {
     const col = index % nodesPerRow;
-    const row = Math.floor(index / nodesPerRow) + startRow;
+    const row = Math.floor(index / nodesPerRow);
     node.position({
       x: col * horizontalSpacing + horizontalSpacing / 2,
-      y: row * verticalSpacing + verticalSpacing / 2
+      y: currentY + row * verticalSpacing
     });
-    index++;
   });
 
-  cy.fit(undefined, 50);
+  // Calculate starting Y for other nodes
+  const expansionRows = Math.ceil(expansionNodes.length / nodesPerRow);
+  currentY += expansionRows * verticalSpacing + 50;
+
+  // Position other nodes
+  otherNodes.forEach((node, index) => {
+    const col = index % nodesPerRow;
+    const row = Math.floor(index / nodesPerRow);
+    node.position({
+      x: col * horizontalSpacing + horizontalSpacing / 2,
+      y: currentY + row * verticalSpacing
+    });
+  });
+
+  cy.fit(undefined, 80);
 }
 
 /**
