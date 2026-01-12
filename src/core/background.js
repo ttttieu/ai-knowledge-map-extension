@@ -406,6 +406,10 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   await initializeServiceWorker();
 });
 
+chrome.sidePanel
+  .setPanelBehavior({ openPanelOnActionClick: true })
+  .catch((error) => console.error(error));
+  
 // Initialize on service worker startup
 initializeServiceWorker().catch(console.error);
 

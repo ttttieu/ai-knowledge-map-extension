@@ -4,7 +4,7 @@
  * Stores projects and nodes for knowledge mapping
  */
 
-import Dexie from '../assets/dexie.min.js';
+import Dexie from '../assets/dexie.mjs';
 
 // Initialize Dexie database
 const KnowledgeMapDB = new Dexie('KnowledgeMapDB');

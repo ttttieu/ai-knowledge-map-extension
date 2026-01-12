@@ -10,18 +10,9 @@
     "activeTab"
   ],
 
-  "host_permissions": [
-    "https://chatgpt.com/*",
-    "https://chat.openai.com/*",
-    "https://claude.ai/*",
-    "https://gemini.google.com/*",
-    "https://grok.com/*",
-    "https://x.com/i/grok/*"
-  ],
-
   "background": {
     "service_worker": "src/core/background.js",
-    "type": "module"
+    "type": "module"    
   },
 
   "side_panel": {
@@ -62,25 +53,31 @@
   ],
 
   "web_accessible_resources": [
-    {
-      "resources": [
-        "src/adapters/*.js",
-        "src/core/*.js",
-        "src/utils/*.js",
-        "src/assets/*.js",
-        "src/sidepanel/*.js",
-        "src/sidepanel/*.css",
-        "src/styles/*.css"
-      ],
-      "matches": [
-        "https://chatgpt.com/*",
-        "https://chat.openai.com/*",
-        "https://claude.ai/*",
-        "https://gemini.google.com/*",
-        "https://grok.com/*",
-        "https://x.com/i/grok/*"
-      ]
-    }
+  {
+    "resources": [
+      "src/adapters/*.js",
+      "src/core/*.js",
+      "src/utils/*.js",
+      "src/assets/*.js",
+      "src/sidepanel/*.js",
+      "src/sidepanel/*.css",
+      "src/styles/*.css"
+    ],
+    "matches": [
+      "https://chatgpt.com/*",
+      "https://claude.ai/*",
+      "https://gemini.google.com/*",
+      "https://grok.com/*",
+      "https://x.com/*"
+    ]
+  }
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://grok.com/*",
+    "https://x.com/*"
   ],
 
   "minimum_chrome_version": "116"
