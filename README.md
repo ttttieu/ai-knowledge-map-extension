@@ -14,10 +14,13 @@
 
 ### 🎯 Thu thập thông minh
 - **Một click** thêm nội dung AI vào bản đồ
-- **Tự động phân loại** nodes theo loại:
-  - 🔵 **CORE**: Khái niệm chính, nội dung cốt lõi
-  - 🟡 **EXPANSION**: Ý tưởng mở rộng, gợi ý khám phá
-  - 🟢 **TABLE_ROW**: Dữ liệu bảng biểu
+- **Tự xây dựng** nodes theo các nội dung:
+  - 📌 **TITLE**: Tên node
+  - 📝 **SUMMARY**: Khái niệm chính, nội dung cốt lõi
+  - 💡 **GỢI MỞ/NEXT STEPS**: Ý tưởng mở rộng, gợi ý khám phá từ cuộc hội thoại
+  - **Scoll to Source Message**: Nút bấm để xem lại toàn bộ nội dung của node nếu đang trong cuôc hội thoại
+  - ↗️**Open coversation**: Chuyển đến đúng cuộc hội thoại nếu đang ở ngoài
+  - 📎**Previous in Conversation**, kết hợp cùng GỢI MỞ/NEXT STEPS để định vị lại trong luồng tư duy
 
 ### 📁 Quản lý đa dự án
 - Tạo nhiều project riêng biệt
@@ -27,12 +30,8 @@
 
 ### 🔄 Auto Layout thông minh
 - **Force-Directed**: Thuật toán lực đẩy tự động bung nodes đẹp mắt
-- **Grid Layout**: Sắp xếp theo lưới có cấu trúc
+- **Grid Layout**: Sắp xếp theo lưới có cấu trúc - Mặc định
 - **Radial Layout**: CORE ở tâm, EXPANSION xung quanh
-
-### 📤 Xuất dữ liệu linh hoạt
-- **Markdown**: Xuất file .md có cấu trúc
-- **Mermaid for Notion**: Copy diagram code, paste vào Notion
 
 ### 💾 Lưu trữ an toàn
 - Dữ liệu lưu local trong Chrome Storage
@@ -87,14 +86,9 @@ cd knowledge-map-extension
 | **Click node** | Xem chi tiết nội dung |
 | **Kéo thả** | Di chuyển node |
 | **Scroll** | Zoom in/out |
-| **🔄 Auto Layout** | Bung nodes theo thuật toán lực đẩy |
 | **📊 Grid** | Sắp xếp dạng lưới |
 | **🎯 Radial** | Bố cục hình tròn |
 
-### Bước 4: Xuất dữ liệu
-
-- **📄 Export MD**: Tải file Markdown
-- **📤 Notion**: Copy Mermaid code → Paste vào Notion block
 
 ---
 
@@ -159,53 +153,6 @@ cd knowledge-map-extension
 
 ---
 
-## 🔧 Thuật toán Force-Directed Layout
-
-Extension sử dụng thuật toán **lực đẩy Coulomb** kết hợp **lực hút Hooke** để tự động sắp xếp nodes:
-
-```
-Lực đẩy (Repulsion):  F = k / r²
-Lực hút (Attraction): F = -k(x - x₀)
-Trọng lực về tâm:     F = g × distance_to_center
-```
-
-**Tham số có thể điều chỉnh** trong `autoLayout.js`:
-
-| Tham số | Mặc định | Mô tả |
-|---------|----------|-------|
-| `REPULSION_STRENGTH` | 8000 | Lực đẩy giữa nodes |
-| `ATTRACTION_STRENGTH` | 0.05 | Lực hút của edges |
-| `IDEAL_DISTANCE` | 250 | Khoảng cách lý tưởng |
-| `DAMPING` | 0.85 | Hệ số ma sát |
-| `MAX_ITERATIONS` | 300 | Số vòng lặp tối đa |
-
----
-
-## 📤 Export Mermaid (Notion)
-
-Khi click **📤 Notion**, extension tạo Mermaid code tương thích:
-
-```mermaid
-graph TD
-    ROOT["🗺️ <b>Project Name</b>"]
-    N1["<b>Khái niệm 1</b><br/>Nội dung tóm tắt..."]
-    N2["<b>Khái niệm 2</b><br/>Nội dung tóm tắt..."]
-    
-    ROOT --> N1
-    N1 --> N2
-    
-    style ROOT fill:#fef3c7,stroke:#d97706,stroke-width:3px
-    style N1 fill:#dbeafe,stroke:#3b82f6,stroke-width:2px
-    style N2 fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
-```
-
-**Sử dụng trong Notion:**
-1. Click **📤 Notion** → Code được copy vào clipboard
-2. Trong Notion, gõ `/code` → Chọn Code block
-3. Paste code → Notion tự render diagram
-
----
-
 ## 🌐 Nền tảng hỗ trợ
 
 | Platform | URL | Status |
@@ -254,8 +201,6 @@ graph TD
 
 ### v1.1.0 (Current)
 - ✨ Multi-project management
-- ✨ Force-directed auto layout
-- ✨ Export to Mermaid (Notion compatible)
 - ✨ Grid & Radial layout options
 - ✨ Delete individual nodes
 - 🔧 Refactored to vanilla JS Side Panel
@@ -294,5 +239,5 @@ MIT License - Xem file [LICENSE](LICENSE) để biết thêm chi tiết.
 ---
 
 <p align="center">
-  Made with ❤️ for knowledge seekers
+  Made with ❤️ for AI miners
 </p>
